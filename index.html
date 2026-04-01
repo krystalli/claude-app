@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>股票投資計算器</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #64748b;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 0.4rem;
+      font-weight: 500;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
+
+    input::placeholder { color: #475569; }
+
+    .presets {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+
+    .preset-btn {
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      border: 1px solid #475569;
+      background: transparent;
+      color: #94a3b8;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      border-color: #38bdf8;
+      color: #38bdf8;
+    }
+
+    .calc-btn {
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .calc-btn:hover { opacity: 0.9; }
+
+    .results { display: none; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 0.4rem;
+    }
+
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #38bdf8;
+    }
+
+    .stat-value.green { color: #4ade80; }
+    .stat-value.purple { color: #a78bfa; }
+
+    .chart-wrapper {
+      position: relative;
+      height: 320px;
+      margin-bottom: 1.5rem;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      padding: 0.65rem 1rem;
+      text-align: right;
+      font-weight: 500;
+      border-bottom: 1px solid #334155;
+    }
+
+    th:first-child { text-align: left; }
+
+    td {
+      padding: 0.6rem 1rem;
+      text-align: right;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+    }
+
+    td:first-child { text-align: left; color: #94a3b8; }
+
+    tr:hover td { background: #1e293b; }
+
+    .profit-cell { color: #4ade80; }
+
+    .highlight-row td {
+      background: #1e3a5f;
+      font-weight: 600;
+    }
+
+    .highlight-row td:first-child { color: #38bdf8; }
+
+    .note {
+      text-align: center;
+      color: #475569;
+      font-size: 0.78rem;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<h1>股票投資計算器</h1>
+<p class="subtitle">輸入股票資訊與投資金額，預估 5～20 年的資產成長</p>
+
+<div class="card">
+  <div class="form-grid">
+    <div>
+      <label>股票代號（選填）</label>
+      <input id="ticker" type="text" placeholder="例如：2330、AAPL" maxlength="10" />
+    </div>
+
+    <div>
+      <label>初始投資金額（元）</label>
+      <input id="principal" type="number" placeholder="例如：100000" min="0" />
+    </div>
+
+    <div>
+      <label>每月定期定額（元，可為 0）</label>
+      <input id="monthly" type="number" placeholder="例如：5000" min="0" value="0" />
+    </div>
+
+    <div>
+      <label>預期年化報酬率（%）</label>
+      <input id="rate" type="number" placeholder="例如：10" step="0.1" />
+      <div class="presets">
+        <button class="preset-btn" onclick="setRate(7)">保守 7%</button>
+        <button class="preset-btn" onclick="setRate(10)">S&amp;P500 10%</button>
+        <button class="preset-btn" onclick="setRate(15)">積極 15%</button>
+        <button class="preset-btn" onclick="setRate(20)">高風險 20%</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">計算投資成長</button>
+</div>
+
+<div class="results card" id="results">
+  <div class="stats-grid" id="statsGrid"></div>
+  <div class="chart-wrapper">
+    <canvas id="chart"></canvas>
+  </div>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>年份</th>
+          <th>總投入本金（元）</th>
+          <th>資產總值（元）</th>
+          <th>獲利（元）</th>
+          <th>報酬率</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <p class="note">* 此計算為估算，不構成投資建議。實際報酬受市場波動影響。</p>
+</div>
+
+<script>
+  let chartInstance = null;
+
+  function setRate(val) {
+    document.getElementById('rate').value = val;
+  }
+
+  function fmt(n) {
+    return Math.round(n).toLocaleString('zh-TW');
+  }
+
+  function calculate() {
+    const ticker = document.getElementById('ticker').value.trim().toUpperCase() || '股票';
+    const principal = parseFloat(document.getElementById('principal').value) || 0;
+    const monthly = parseFloat(document.getElementById('monthly').value) || 0;
+    const rate = parseFloat(document.getElementById('rate').value);
+
+    if (!rate || rate <= 0) {
+      alert('請輸入預期年化報酬率');
+      return;
+    }
+    if (principal <= 0 && monthly <= 0) {
+      alert('請輸入初始投資金額或每月定投金額');
+      return;
+    }
+
+    const r = rate / 100;
+    const rm = r / 12; // monthly rate
+
+    const years = [];
+    const totals = [];
+    const principals = [];
+
+    for (let y = 1; y <= 20; y++) {
+      // Compound principal
+      const compounded = principal * Math.pow(1 + r, y);
+      // Future value of monthly contributions
+      const monthlyFV = monthly > 0
+        ? monthly * ((Math.pow(1 + rm, y * 12) - 1) / rm)
+        : 0;
+      const total = compounded + monthlyFV;
+      const invested = principal + monthly * 12 * y;
+
+      years.push(y);
+      totals.push(total);
+      principals.push(invested);
+    }
+
+    // Render stats for key milestones
+    const y5 = totals[4], p5 = principals[4];
+    const y10 = totals[9], p10 = principals[9];
+    const y20 = totals[19], p20 = principals[19];
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-box">
+        <div class="stat-label">5 年後資產</div>
+        <div class="stat-value">$${fmt(y5)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">5 年獲利</div>
+        <div class="stat-value green">+$${fmt(y5 - p5)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">10 年後資產</div>
+        <div class="stat-value">$${fmt(y10)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">10 年獲利</div>
+        <div class="stat-value green">+$${fmt(y10 - p10)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">20 年後資產</div>
+        <div class="stat-value purple">$${fmt(y20)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">20 年報酬率</div>
+        <div class="stat-value purple">${((y20 / p20 - 1) * 100).toFixed(1)}%</div>
+      </div>
+    `;
+
+    // Chart
+    if (chartInstance) chartInstance.destroy();
+    const ctx = document.getElementById('chart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: years.map(y => `${y}年`),
+        datasets: [
+          {
+            label: '資產總值',
+            data: totals,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+          },
+          {
+            label: '投入本金',
+            data: principals,
+            borderColor: '#475569',
+            backgroundColor: 'rgba(71,85,105,0.1)',
+            fill: true,
+            tension: 0.4,
+            borderDash: [5, 5],
+            pointRadius: 3,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#94a3b8' } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: $${fmt(ctx.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+          y: {
+            ticks: {
+              color: '#64748b',
+              callback: v => '$' + (v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : fmt(v))
+            },
+            grid: { color: '#1e293b' }
+          }
+        }
+      }
+    });
+
+    // Table
+    const highlights = new Set([5, 10, 15, 20]);
+    let rows = '';
+    for (let i = 0; i < 20; i++) {
+      const y = years[i], total = totals[i], invested = principals[i];
+      const profit = total - invested;
+      const roi = ((total / invested - 1) * 100).toFixed(1);
+      const cls = highlights.has(y) ? 'highlight-row' : '';
+      rows += `<tr class="${cls}">
+        <td>${y} 年</td>
+        <td>$${fmt(invested)}</td>
+        <td>$${fmt(total)}</td>
+        <td class="profit-cell">+$${fmt(profit)}</td>
+        <td class="profit-cell">+${roi}%</td>
+      </tr>`;
+    }
+    document.getElementById('tableBody').innerHTML = rows;
+
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>

@@ -97,6 +97,32 @@
       color: #38bdf8;
     }
 
+    .fetch-btn {
+      margin-top: 0.5rem;
+      padding: 0.4rem 1rem;
+      background: #0f4c75;
+      border: 1px solid #38bdf8;
+      border-radius: 8px;
+      color: #38bdf8;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+    }
+
+    .fetch-btn:hover { background: #1a6495; }
+    .fetch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .fetch-status {
+      font-size: 0.78rem;
+      margin-top: 0.4rem;
+      min-height: 1.2em;
+    }
+
+    .fetch-status.ok { color: #4ade80; }
+    .fetch-status.err { color: #f87171; }
+    .fetch-status.loading { color: #94a3b8; }
+
     .calc-btn {
       width: 100%;
       margin-top: 1.5rem;
@@ -208,8 +234,10 @@
 <div class="card">
   <div class="form-grid">
     <div>
-      <label>股票代號（選填）</label>
-      <input id="ticker" type="text" placeholder="例如：2330、AAPL" maxlength="10" />
+      <label>股票代號</label>
+      <input id="ticker" type="text" placeholder="例如：2330.TW、AAPL" maxlength="12" />
+      <button class="fetch-btn" onclick="fetchCAGR()">抓取歷史年化報酬率</button>
+      <div class="fetch-status" id="fetchStatus"></div>
     </div>
 
     <div>
@@ -264,6 +292,60 @@
 
   function setRate(val) {
     document.getElementById('rate').value = val;
+  }
+
+  async function fetchCAGR() {
+    const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+    const status = document.getElementById('fetchStatus');
+    const btn = document.querySelector('.fetch-btn');
+
+    if (!ticker) {
+      status.className = 'fetch-status err';
+      status.textContent = '請先輸入股票代號';
+      return;
+    }
+
+    status.className = 'fetch-status loading';
+    status.textContent = '抓取中...';
+    btn.disabled = true;
+
+    try {
+      // Use Yahoo Finance v8 chart API via CORS proxy
+      const proxy = 'https://corsproxy.io/?';
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=10y&interval=1mo&events=div`;
+      const res = await fetch(proxy + encodeURIComponent(url));
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      const result = data?.chart?.result?.[0];
+      if (!result) throw new Error('查無此股票');
+
+      const closes = result.indicators?.adjclose?.[0]?.adjclose || result.indicators?.quote?.[0]?.close;
+      if (!closes || closes.length < 24) throw new Error('歷史資料不足');
+
+      // Filter out null values
+      const valid = closes.filter(v => v != null);
+      const startPrice = valid[0];
+      const endPrice = valid[valid.length - 1];
+      const years = valid.length / 12;
+
+      const cagr = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
+      const cagrRounded = Math.round(cagr * 10) / 10;
+
+      document.getElementById('rate').value = cagrRounded;
+
+      const meta = result.meta;
+      const name = meta?.longName || meta?.shortName || ticker;
+      const period = Math.round(years);
+
+      status.className = 'fetch-status ok';
+      status.textContent = `✓ ${name}｜近 ${period} 年 CAGR：${cagrRounded > 0 ? '+' : ''}${cagrRounded}%`;
+    } catch (e) {
+      status.className = 'fetch-status err';
+      status.textContent = `❌ 抓取失敗：${e.message}（台股請加 .TW，例如 2330.TW）`;
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function fmt(n) {

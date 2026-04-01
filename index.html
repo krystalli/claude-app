@@ -286,16 +286,14 @@
     }
 
     const r = rate / 100;
-    const rm = r / 12; // monthly rate
+    const rm = r / 12;
 
     const years = [];
     const totals = [];
     const principals = [];
 
     for (let y = 1; y <= 20; y++) {
-      // Compound principal
       const compounded = principal * Math.pow(1 + r, y);
-      // Future value of monthly contributions
       const monthlyFV = monthly > 0
         ? monthly * ((Math.pow(1 + rm, y * 12) - 1) / rm)
         : 0;
@@ -307,7 +305,6 @@
       principals.push(invested);
     }
 
-    // Render stats for key milestones
     const y5 = totals[4], p5 = principals[4];
     const y10 = totals[9], p10 = principals[9];
     const y20 = totals[19], p20 = principals[19];
@@ -339,7 +336,6 @@
       </div>
     `;
 
-    // Chart
     if (chartInstance) chartInstance.destroy();
     const ctx = document.getElementById('chart').getContext('2d');
     chartInstance = new Chart(ctx, {
@@ -392,7 +388,6 @@
       }
     });
 
-    // Table
     const highlights = new Set([5, 10, 15, 20]);
     let rows = '';
     for (let i = 0; i < 20; i++) {
